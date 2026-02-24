@@ -82,11 +82,10 @@ For each scenario, the scanner also captures:
 ## How to get started
 
 ### 1. Clone the Architecture Center repo
-```bash
-git clone https://github.com/MicrosoftDocs/architecture-center
+Clone https://github.com/MicrosoftDocs/architecture-center
 
 ### 2. Copy Scnaner Files
-- Copy scanner files into the cloned Architecture Center repo, preserving paths.
+Copy scanner files into the cloned Architecture Center repo, preserving paths.
 
 ### 3. Run via GitHub Actions
 - Push changes to your fork
@@ -96,7 +95,7 @@ git clone https://github.com/MicrosoftDocs/architecture-center
 ---
 
 ## Outputs and how to interpret them
-Upons successfully running workflow with GitHub actions you can download the `scan-results.xlsx` file, a human‑readable report for analysis and sharing.
+Upon successfully running workflow with GitHub actions you can download the `scan-results.xlsx` file, a human‑readable report for analysis and sharing.
 Key columns include: 
 - title - a title of the article from the yml file
 - description - a description of the article from the yml file
