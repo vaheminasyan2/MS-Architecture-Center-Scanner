@@ -57,10 +57,59 @@ For each scenario, the scanner also captures:
 
 ---
 
-## Repository files
+## Repository files and what they do
 
-### Required files (core workflow)
+- `scripts/scan_architecture_center_yml.py`  
+  Scans YAML + included MD articles and produces `scan-results.json`
 
-These are the **only files required** to run the scanner end‑to‑end:
+- `scripts/build_scan_results_xlsx.py`  
+  Converts JSON results into a human‑readable Excel file
 
-``
+- `.github/scan_and_compare.yml`  
+  GitHub Actions workflow that runs the scanner automatically
+
+ - `estimate_scenarios.xlsx`**
+   Reference list of known or submitted estimate scenarios used for comparison, validation, or tracking progress over time
+
+- `run_compare_only.py`
+  Helper that compares scan output against `estimate_scenarios.xlsx`
+
+- `estimate_scenarios.xlsx`
+  Excel file with the latest estimate templates. 
+
+---
+
+## How to get started
+
+### 1. Clone the Architecture Center repo
+```bash
+git clone https://github.com/MicrosoftDocs/architecture-center
+
+### 2. Copy Scnaner Files
+- Copy scanner files into the cloned Architecture Center repo, preserving paths.
+
+### 3. Run via GitHub Actions
+- Push changes to your fork
+- Open GitHub Actions
+- Manually trigger the scan_and_compare workflow
+
+---
+
+## Outputs and how to interpret them
+Upons successfully running workflow with GitHub actions you can download the `scan-results.xlsx` file, a human‑readable report for analysis and sharing.
+Key columns include: 
+- title - a title of the article from the yml file
+- description - a description of the article from the yml file
+- azureCategories - categories from the yml file
+- ms.date — freshness / prioritization signal
+- yml_URL - article URL
+- image_download_urls — images found in the article
+- estimate_link — selected usable estimate (if any)
+- criteria_passed — pricing readiness indicator
+- failure_reason — why the scenario failed
+- yml_path - article yml file path
+- include_md_path - article .md file path
+- md_author_name / md_ms_author_name — ownership context
+- comparison_status - result comparison 
+
+
