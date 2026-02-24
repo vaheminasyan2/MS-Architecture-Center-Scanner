@@ -27,20 +27,20 @@ If no usable estimate is found, the scenario fails with one of these reasons:
 
 ## Repository files and what they do
 
-- `scripts/scan_architecture_center_yml.py`  
-  Scans YAML + included MD articles and produces `scan-results.json`
-
 - `scripts/build_scan_results_xlsx.py`  
   Converts JSON results into a human‑readable Excel file
+
+  - `script/run_compare_only.py`
+  Helper that compares scan output against `estimate_scenarios.xlsx`
+
+- `scripts/scan_architecture_center_yml.py`  
+  Scans YAML + included MD articles and produces `scan-results.json`
 
 - `.github/scan_and_compare.yml`  
   GitHub Actions workflow that runs the scanner automatically
 
  - `estimate_scenarios.xlsx`**
    Reference list of known or submitted estimate scenarios used for comparison, validation, or tracking progress over time
-
-- `run_compare_only.py`
-  Helper that compares scan output against `estimate_scenarios.xlsx`
 
 ## How to get started
 
