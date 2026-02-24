@@ -1,5 +1,3 @@
-# NOTE: This script ONLY refines comparison_status for criteria_passed = TRUE scenarios.
-
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
@@ -14,14 +12,16 @@ YML_URL_COL = 'yml_url'
 CRITERIA_COL = 'criteria_passed'
 STATUS_COL = 'comparison_status'
 
-# Status values to write into existing comparison_status column (for criteria_passed == TRUE rows)
+# Status values
 STATUS_SAME = 'matched_existing_scenario_same_estimate'
-STATUS_NEW  = 'matched_existing_scenario_new_estimate'
+STATUS_NEW_ESTIMATE = 'matched_existing_scenario_new_estimate'
+STATUS_NEW_CANDIDATE = 'new_estimate_candidate'
+STATUS_NOT_APPLICABLE = 'not_applicable'
 
 # --- URL normalization helpers ---
 
 def _normalize_learn_url(url: str) -> str:
-    """Normalize Learn URLs for stable matching (case/whitespace, trailing slash)."""
+    """Normalize Learn URLs for stable scenario matching."""
     if url is None:
         return ''
     u = str(url).strip()
@@ -31,21 +31,15 @@ def _normalize_learn_url(url: str) -> str:
     scheme = parts.scheme.lower()
     netloc = parts.netloc.lower()
     path = parts.path.rstrip('/')
-    # Learn URLs: ignore query/fragment for matching scenarios
     return urlunsplit((scheme, netloc, path, '', ''))
 
 
 def _normalize_estimate_url(url: str) -> str:
     """Normalize estimate URLs so formatting differences don't create false mismatches.
 
-    - Trim whitespace
-    - Lowercase scheme+host
-    - Strip fragment
-    - Normalize path (no trailing slash)
-    - Keep only key query params for estimate comparison:
-        * shared-estimate
-        * service
-      (Other query params are dropped)
+    Keeps only query params that define the estimate identity:
+      - shared-estimate
+      - service
     """
     if url is None:
         return ''
@@ -58,19 +52,16 @@ def _normalize_estimate_url(url: str) -> str:
     netloc = parts.netloc.lower()
     path = parts.path.rstrip('/')
 
-    # Parse query; keep only params that define the estimate identity
     keep_keys = {'shared-estimate', 'service'}
     q = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=False) if k.lower() in keep_keys]
-
-    # Sort for deterministic comparison
-    q_sorted = sorted((k.lower(), v.strip()) for k, v in q if v is not None)
+    q_sorted = sorted((k.lower(), (v or '').strip()) for k, v in q)
     query = urlencode(q_sorted, doseq=True)
 
     return urlunsplit((scheme, netloc, path, query, ''))
 
 
 def _split_estimate_links(cell_value) -> list:
-    """Scan results can contain multiple estimate links in a single cell.
+    """Scan results may contain multiple estimate links per scenario.
     Support newline-delimited and semicolon-delimited values.
     """
     if cell_value is None:
@@ -79,14 +70,12 @@ def _split_estimate_links(cell_value) -> list:
     if not s:
         return []
 
-    # Common delimiters
     parts = []
     for chunk in s.replace(';', '\n').splitlines():
         chunk = chunk.strip()
         if chunk:
             parts.append(chunk)
 
-    # De-dupe while preserving order
     seen = set()
     out = []
     for p in parts:
@@ -117,15 +106,21 @@ if missing_inv:
         f"Found columns: {list(est_df.columns)}"
     )
 
-# Ensure comparison_status exists (we overwrite values only for applicable rows)
+# Ensure comparison_status exists
 if STATUS_COL not in scan_df.columns:
-    scan_df[STATUS_COL] = 'not_applicable'
+    scan_df[STATUS_COL] = STATUS_NOT_APPLICABLE
+
+# Normalize criteria_passed (supports bool or string)
+criteria_true = (
+    scan_df[CRITERIA_COL].astype(str).str.strip().str.lower().isin(['true', '1', 'yes'])
+    | (scan_df[CRITERIA_COL] == True)
+)
 
 # Normalize scenario keys (Learn URL)
 scan_df['_scenario_key'] = scan_df[YML_URL_COL].astype(str).map(_normalize_learn_url)
 est_df['_scenario_key'] = est_df[YML_URL_COL].astype(str).map(_normalize_learn_url)
 
-# Inventory: one estimate link per scenario (per user)
+# Build inventory map: one estimate link per scenario
 inv_map = {}
 for _, row in est_df.iterrows():
     key = row.get('_scenario_key', '')
@@ -136,53 +131,51 @@ for _, row in est_df.iterrows():
         continue
     inv_map[key] = inv_link
 
-# Apply comparison only for matched scenarios where criteria_passed is TRUE
-# (criteria_passed may be boolean or string; normalize)
-criteria_true = scan_df[CRITERIA_COL].astype(str).str.strip().str.lower().isin(['true', '1', 'yes']) | (scan_df[CRITERIA_COL] == True)
-
 matched_in_inventory = scan_df['_scenario_key'].isin(inv_map.keys())
+
+# Default statuses to preserve previous behavior
+scan_df.loc[~criteria_true, STATUS_COL] = STATUS_NOT_APPLICABLE
+scan_df.loc[criteria_true & ~matched_in_inventory, STATUS_COL] = STATUS_NEW_CANDIDATE
+
+# Split matched existing scenario into SAME vs NEW estimate link
 applicable = criteria_true & matched_in_inventory
 
-# Compute status for applicable rows
-statuses = []
 for idx, row in scan_df.loc[applicable].iterrows():
-    key = row['_scenario_key']
-    inv_link = inv_map.get(key, '')
+    inv_link = inv_map.get(row['_scenario_key'], '')
     scanned_links = _split_estimate_links(row.get(ESTIMATE_LINK_COL, ''))
-
     if inv_link and any(l == inv_link for l in scanned_links):
-        statuses.append((idx, STATUS_SAME))
+        scan_df.at[idx, STATUS_COL] = STATUS_SAME
     else:
-        statuses.append((idx, STATUS_NEW))
+        scan_df.at[idx, STATUS_COL] = STATUS_NEW_ESTIMATE
 
-for idx, status in statuses:
-    scan_df.at[idx, STATUS_COL] = status
+# New tab request: include rows with these statuses
+needs_review = scan_df[scan_df[STATUS_COL].isin([STATUS_NEW_ESTIMATE, STATUS_NEW_CANDIDATE])].copy()
 
-# Optional: keep previous behavior for non-applicable rows as-is.
-
-# Build summary
+# Summary
 summary = pd.DataFrame({
     'Metric': [
         'Total scanned scenarios',
         'Scenarios criteria_passed = TRUE',
-        'Matched inventory scenarios (criteria_passed = TRUE)',
+        'Scenarios not in inventory (new_estimate_candidate)',
         'matched_existing_scenario_same_estimate',
         'matched_existing_scenario_new_estimate',
+        'Rows in needs-review tab',
         'Scan date (UTC)',
         'Repo commit'
     ],
     'Value': [
         int(len(scan_df)),
         int(criteria_true.sum()),
-        int(applicable.sum()),
+        int((scan_df[STATUS_COL] == STATUS_NEW_CANDIDATE).sum()),
         int((scan_df[STATUS_COL] == STATUS_SAME).sum()),
-        int((scan_df[STATUS_COL] == STATUS_NEW).sum()),
+        int((scan_df[STATUS_COL] == STATUS_NEW_ESTIMATE).sum()),
+        int(len(needs_review)),
         datetime.utcnow().isoformat(),
         os.getenv('GITHUB_SHA', 'local')
     ]
 })
 
-# Write back to the same workbook
 with pd.ExcelWriter(SCAN_RESULTS_PATH, engine='openpyxl', mode='w') as writer:
     scan_df.drop(columns=['_scenario_key']).to_excel(writer, sheet_name='scan-results', index=False)
+    needs_review.to_excel(writer, sheet_name='needs-review', index=False)
     summary.to_excel(writer, sheet_name='summary', index=False)
