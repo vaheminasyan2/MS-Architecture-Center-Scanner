@@ -74,9 +74,6 @@ For each scenario, the scanner also captures:
 - `run_compare_only.py`
   Helper that compares scan output against `estimate_scenarios.xlsx`
 
-- `estimate_scenarios.xlsx`
-  Excel file with the latest estimate templates. 
-
 ---
 
 ## How to get started
