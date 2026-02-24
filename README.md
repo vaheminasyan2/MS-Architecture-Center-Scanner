@@ -1,6 +1,6 @@
 # MS Architecture Center Scanner
 
-A lightweight scanning tool used to analyzes **[Azure Architecture Center articles](https://learn.microsoft.com/en-us/azure/architecture/browse/)** to determine scenarios that include a usable **Azure pricing calculator estimate link** and compare it against a reference list of known scenarios, helping to identify cost-ready scenarios and highlight estimate gaps. 
+A lightweight scanning tool used to analyzes **[Azure Architecture Center articles](https://learn.microsoft.com/en-us/azure/architecture/browse/)** to determine scenarios that include a usable **Azure pricing calculator estimate link** and compare it against a reference list of known scenarios, helping to identify estimate-ready scenarios, updated estimate links and highlight gaps. 
 
 ## What the scanner evaluates
 
