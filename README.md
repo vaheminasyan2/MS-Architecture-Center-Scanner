@@ -22,7 +22,13 @@ If no usable estimate is found, the scenario fails with one of these reasons:
   Pricing Calculator links exist, but they are **tool/root links only** (no saved or scoped estimate).
 
 - **`no_estimate_link`**  
-  No Pricing Calculator links of any kind were found in the article. 
+  No Pricing Calculator links of any kind were found in the article.
+
+## Estimate comparison (post-scan)
+
+For scenarios where `criteria_passed = TRUE`, the scanner compares the detected **usable estimate link** against a reference inventory in `estimate_scenarios.xlsx`. 
+
+This comparison answers question:**Is this scenario already associated with the same estimate, or does it now reference a different estimate?**
 
 ## Repository files and what they do
 
@@ -33,10 +39,11 @@ Scans Architecture Center YAML files and their included Markdown articles. Produ
 Converts `scan-results.json` into a human‑readable Excel report `scan-results.xlsx`. This is the the authoritative JSON -> Excel converter. 
 
 `estimate_scenarios.xlsx`.  
-Reference list of known or submitted estimate scenarios used for comparison.
+Reference inventory of known scenarios and their canonical estimate links. Used to detect new scenarios with estimates, updated estimates and gaps.
 
 `script/run_compare_only.py`.  
-Helper that compares scan output against `estimate_scenarios.xlsx`. 
+Compares cost‑ready scenarios (`criteria_passed = TRUE`) against `estimate_scenarios.xlsx` and updates the `comparison_status` column in
+  `scan-results.xlsx`
 
 `.github/scan_and_compare.yml`.  
 GitHub Actions workflow that runs the scanner automatically. 
@@ -72,3 +79,14 @@ Key columns include:
 - include_md_path — Path to the included Markdown article
 - md_author_name / md_ms_author_name — Ownership contextHow to use the results
 - comparison_status - scenario comparison results.
+
+
+| comparison_status value | Meaning |
+|-------------------------|--------|
+| `matched_existing_scenario_same_estimate` | Scenario exists in inventory and the scanned estimate link matches the inventory estimate link |
+| `matched_existing_scenario_new_estimate` | Scenario exists in inventory, but the scanned estimate link is different |
+| `new_estimate_candidate` | Scenario passed (`criteria_passed = TRUE`) but does not exist in the inventory |
+| `not_applicable` | Scenario failed (`criteria_passed = FALSE`); comparison is not performed |
+
+Only scenarios with `criteria_passed = TRUE` participate in estimate comparison.
+
