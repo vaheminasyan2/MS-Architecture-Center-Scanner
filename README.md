@@ -78,7 +78,7 @@ Key columns include:
 - yml_path — Path to the scenario YAML file
 - include_md_path — Path to the included Markdown article
 - md_author_name / md_ms_author_name — Ownership contextHow to use the results
-- comparison_status - scenario comparison results.
+- comparison_status - scenario comparison results which will be one of these below:
 
 
 | comparison_status value | Meaning |
