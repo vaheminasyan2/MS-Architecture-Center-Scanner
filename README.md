@@ -1,17 +1,16 @@
 # MS Architecture Center Scanner
 
-A lightweight scanning tool used to analyze **[Azure Architecture Center articles](https://learn.microsoft.com/en-us/azure/architecture/browse/)** and determine which article includes a **Azure pricing calculator estimate link**.
+A lightweight scanning tool used to analyzes **[Azure Architecture Center articles](https://learn.microsoft.com/en-us/azure/architecture/browse/)** to determine scenarios that include a usable **Azure pricing calculator estimate link** and compare it against a reference list of known scenarios, helping to identify cost-ready scenarios and highlight estimate gaps. 
 
 ## What the scanner evaluates
 
 ### Primary question (pass / fail)
-**Does the Architecture Center article include a usable pricing estimate link?**
+The scanner ansswers the primary question **Does the Architecture Center article include a usable pricing estimate link?**. 
 
-A scenario **passes (`criteria_passed = TRUE`)** if the included `.md` article contains **at least one** of the following:
+It **passes (`criteria_passed = TRUE`)** if markdown article contains **at least one** of the following:
 
-1. **Azure Pricing Calcualtor Estimate link in this format**  
-   `https://azure.com/e/*`
-   `https://azure.microsoft.com/pricing/calculator?...shared-estimate=*`
+1. **Azure Pricing Calcualtor Estimate links**  
+   `https://azure.com/e/*` or `https://azure.microsoft.com/pricing/calculator?...shared-estimate=*`
 
 2. **Service‑scoped Pricing Calculator Estimate link**  
    `https://azure.microsoft.com/pricing/calculator?...service=*`
@@ -23,53 +22,53 @@ If no usable estimate is found, the scenario fails with one of these reasons:
   Pricing Calculator links exist, but they are **tool/root links only** (no saved or scoped estimate).
 
 - **`no_estimate_link`**  
-  No Pricing Calculator links of any kind were found.
+  No Pricing Calculator links of any kind were found in the article. 
 
 ## Repository files and what they do
 
-- `scripts/build_scan_results_xlsx.py`  
-  Converts JSON results into a human‑readable Excel file
+`scripts/scan_architecture_center_yml.py`.  
+Scans Architecture Center YAML files and their included Markdown articles. Produces  `scan-results.json`.
 
-  - `script/run_compare_only.py`
-  Helper that compares scan output against `estimate_scenarios.xlsx`
+`scripts/build_scan_results_xlsx.py`.  
+Converts `scan-results.json` into a human‑readable Excel report `scan-results.xlsx`. This is the the authoritative JSON -> Excel converter. 
 
-- `scripts/scan_architecture_center_yml.py`  
-  Scans YAML + included MD articles and produces `scan-results.json`
+`estimate_scenarios.xlsx`.  
+Reference list of known or submitted estimate scenarios used for comparison.
 
-- `.github/scan_and_compare.yml`  
-  GitHub Actions workflow that runs the scanner automatically
+`script/run_compare_only.py`.  
+Helper that compares scan output against `estimate_scenarios.xlsx`. 
 
- - `estimate_scenarios.xlsx`**
-   Reference list of known or submitted estimate scenarios used for comparison, validation, or tracking progress over time
+`.github/scan_and_compare.yml`.  
+GitHub Actions workflow that runs the scanner automatically. 
 
 ## How to get started
 
-### 1. Clone the Architecture Center repo
-Clone https://github.com/MicrosoftDocs/architecture-center
+### 1. Fork the Architecture Center repo
+https://github.com/MicrosoftDocs/architecture-center.
 
 ### 2. Copy Scnaner Files
-Copy scanner files into the cloned Architecture Center repo, preserving paths.
+Copy scanner files into the forked Architecture Center repo, preserving the same paths.
 
 ### 3. Run via GitHub Actions
 - Push changes to your fork
 - Open GitHub Actions
-- Manually trigger the scan_and_compare workflow
+- Select **Architecture Scan + Estimate Comparison** workflow and run it.  
 
 ## Outputs and how to interpret them
-Upon successfully running workflow with GitHub actions you can download the `scan-results.xlsx` file, a human‑readable report for analysis and sharing.
+After a successful run, download the `scan-results.xlsx` from the workflow artificats. 
+
 Key columns include: 
-- title - a title of the article from the yml file
-- description - a description of the article from the yml file
-- azureCategories - categories from the yml file
-- ms.date — freshness / prioritization signal
-- yml_URL - article URL
-- image_download_urls — images found in the article
-- estimate_link — selected usable estimate (if any)
-- criteria_passed — pricing readiness indicator
-- failure_reason — why the scenario failed
-- yml_path - article yml file path
-- include_md_path - article .md file path
-- md_author_name / md_ms_author_name — ownership context
-- comparison_status - result comparison 
 
-
+- title — Article title (from the YAML file)
+- description — Article description (from the YAML file)
+- azureCategories — Azure solution categories from the YAML file
+- ms.date — Freshness / prioritization signal
+- yml_url — Published Architecture Center article URL
+- image_download_urls — Images found in the article (informational)
+- estimate_link — Selected usable estimate link (if any)
+- criteria_passed — Pricing readiness indicator
+- failure_reason — Why the scenario failed (if applicable)
+- yml_path — Path to the scenario YAML file
+- include_md_path — Path to the included Markdown article
+- md_author_name / md_ms_author_name — Ownership contextHow to use the results
+- comparison_status - scenario comparison results.
