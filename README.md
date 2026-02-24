@@ -1,14 +1,6 @@
 # MS Architecture Center Scanner
 
-A lightweight scanning tool used to analyze **Azure Architecture Center scenarios** and determine whether each article includes a **usable Azure pricing estimate**.
-
-The tool is designed to support:
-- Pricing coverage audits
-- Identification of estimate gaps
-- Prioritization of estimate creation work
-- Reporting for PMMs, pricing, and content owners
-
----
+A lightweight scanning tool used to analyze **[Azure Architecture Center articles](https://learn.microsoft.com/en-us/azure/architecture/browse/)** and determine which article includes a **Azure pricing calculator estimate link**.
 
 ## What the scanner evaluates
 
@@ -17,16 +9,12 @@ The tool is designed to support:
 
 A scenario **passes (`criteria_passed = TRUE`)** if the included `.md` article contains **at least one** of the following:
 
-1. **Azure Experience link**  
+1. **Azure Pricing Calcualtor Estimate link in this format**  
    `https://azure.com/e/*`
-
-2. **Shared Pricing Calculator estimate**  
    `https://azure.microsoft.com/pricing/calculator?...shared-estimate=*`
 
-3. **Service‑scoped Pricing Calculator link**  
+2. **Service‑scoped Pricing Calculator Estimate link**  
    `https://azure.microsoft.com/pricing/calculator?...service=*`
-
----
 
 ### Failure reasons
 If no usable estimate is found, the scenario fails with one of these reasons:
@@ -36,26 +24,6 @@ If no usable estimate is found, the scenario fails with one of these reasons:
 
 - **`no_estimate_link`**  
   No Pricing Calculator links of any kind were found.
-
----
-
-### Images (informational only)
-- Images are detected for **every article**
-- Image URLs are captured and included in the output
-- **Images do NOT affect pass/fail**
-- This avoids false negatives while still providing visual context
-
----
-
-### Metadata captured
-For each scenario, the scanner also captures:
-- `ms.date` (from YAML metadata)
-- Article author (`author`)
-- Microsoft author (`ms.author`)
-- Detected pricing links
-- Image download URLs
-
----
 
 ## Repository files and what they do
 
@@ -74,8 +42,6 @@ For each scenario, the scanner also captures:
 - `run_compare_only.py`
   Helper that compares scan output against `estimate_scenarios.xlsx`
 
----
-
 ## How to get started
 
 ### 1. Clone the Architecture Center repo
@@ -88,8 +54,6 @@ Copy scanner files into the cloned Architecture Center repo, preserving paths.
 - Push changes to your fork
 - Open GitHub Actions
 - Manually trigger the scan_and_compare workflow
-
----
 
 ## Outputs and how to interpret them
 Upon successfully running workflow with GitHub actions you can download the `scan-results.xlsx` file, a human‑readable report for analysis and sharing.
