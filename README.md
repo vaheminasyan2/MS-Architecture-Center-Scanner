@@ -28,7 +28,7 @@ If no usable estimate is found, the scenario fails with one of these reasons:
 
 For scenarios where `criteria_passed = TRUE`, the scanner compares the detected **usable estimate link** against a reference inventory in `estimate_scenarios.xlsx`. 
 
-This comparison answers question:**Is this scenario already associated with the same estimate, or does it now reference a different estimate?**
+This comparison answers question: **Is this scenario already associated with the same estimate, or does it now reference a different estimate?**. This can help with on-going maintenace identifying scenarios with updated estimate links.
 
 ## Repository files and what they do
 
