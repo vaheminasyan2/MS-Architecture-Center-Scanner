@@ -1,6 +1,6 @@
 # MS Architecture Center Scanner
 
-A lightweight scanning tool used to analyze **https://learn.microsoft.com/en-us/azure/architecture/browse/** to determine scenarios that include a **usable Azure Pricing Calculator estimate link** and compare them against a reference list of known scenarios. The outputs help identify pricing‑ready scenarios, detect updated estimate links (estimate drift), and highlight gaps.
+A lightweight scanning tool used to analyze articles in the **[Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/browse)** to determine scenarios that include a **usable Azure Pricing Calculator estimate link** and compare them against a reference list of known scenarios. The outputs help identify pricing‑ready scenarios, detect updated estimate links (estimate drift), and highlight gaps.
 
 ## What the scanner evaluates
 
