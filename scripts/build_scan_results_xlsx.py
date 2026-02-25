@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Build scan-results.xlsx from scan-results.json.
-
 - Adds ms.date column (from scanner's ms_date field)
 - Keeps image_download_urls column
 - Enforces estimate_link to ONLY be one of:
@@ -10,6 +9,10 @@
 - Adds author columns:
   - md_author_name
   - md_ms_author_name
+
+Update (2026-02): If multiple compliant estimate links are found for a scenario,
+write ALL of them to the `estimate_link` cell (newline-separated). This prevents
+losing valid tiered estimates (for example Small/Medium/Large).
 """
 
 import argparse
@@ -29,7 +32,8 @@ SERVICE_RE = re.compile(
 )
 
 
-def pick_estimate_link(item: dict) -> str:
+def collect_estimate_links(item: dict) -> list:
+    """Return ALL compliant estimate links (A/B/C), unique and deterministic order."""
     candidates = []
     for key in (
         'usable_estimate_links',
@@ -47,6 +51,7 @@ def pick_estimate_link(item: dict) -> str:
         elif vals:
             candidates.append(str(vals).strip())
 
+    # de-dupe while preserving order
     seen = set()
     ordered = []
     for u in candidates:
@@ -55,16 +60,23 @@ def pick_estimate_link(item: dict) -> str:
         seen.add(u)
         ordered.append(u)
 
-    for u in ordered:
-        if AZURE_EXPERIENCE_RE.match(u):
-            return u
-    for u in ordered:
-        if SHARED_ESTIMATE_RE.match(u):
-            return u
-    for u in ordered:
-        if SERVICE_RE.match(u):
-            return u
-    return ''
+    out = []
+    out_seen = set()
+
+    def _add(regex):
+        for u in ordered:
+            if u in out_seen:
+                continue
+            if regex.match(u):
+                out_seen.add(u)
+                out.append(u)
+
+    # stable ordering by type
+    _add(AZURE_EXPERIENCE_RE)
+    _add(SHARED_ESTIMATE_RE)
+    _add(SERVICE_RE)
+
+    return out
 
 
 def join_list(v):
@@ -84,16 +96,18 @@ def main():
 
     rows = []
     for it in items:
+        links = collect_estimate_links(it)
         rows.append({
             'title': it.get('title') or '',
             'description': it.get('description') or '',
             'azureCategories': '; '.join(it.get('azureCategories') or [])
-                if isinstance(it.get('azureCategories'), list)
-                else (it.get('azureCategories') or ''),
+            if isinstance(it.get('azureCategories'), list)
+            else (it.get('azureCategories') or ''),
             'ms.date': it.get('ms_date') or '',
             'yml_url': it.get('yml_url') or '',
             'image_download_urls': join_list(it.get('image_download_urls') or []),
-            'estimate_link': pick_estimate_link(it),
+            # NEW: include all compliant estimate links (newline-separated)
+            'estimate_link': "\n".join(links),
             'criteria_passed': bool(it.get('criteria_passed', False)),
             'failure_reason': it.get('failure_reason') or '',
             'yml_path': it.get('yml_path') or '',
@@ -104,7 +118,6 @@ def main():
         })
 
     df = pd.DataFrame(rows)
-
     with pd.ExcelWriter(args.output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name='scan-results', index=False)
 
