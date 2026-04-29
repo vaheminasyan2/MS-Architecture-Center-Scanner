@@ -2,6 +2,9 @@ name: Architecture Scan + Estimate Comparison
 on:
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   scan:
     runs-on: ubuntu-latest
