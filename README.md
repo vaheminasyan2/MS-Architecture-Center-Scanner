@@ -4,7 +4,54 @@ A lightweight scanning tool used to analyze articles in the **[Azure Architectur
 
 ## What the scanner evaluates
 
-### Primary question (pass / fail)
+### Two content patterns in the Architecture Center
+
+The Architecture Center publishes articles using two distinct structures. The scanner handles both:
+
+**Pattern A — YML + MD (companion pair)**  
+A `.yml` file contains page metadata and a `[!INCLUDE]` directive pointing to a separate `.md` file that holds the article body. The `.yml` is the published page; the `.md` is the content source.
+
+**Pattern B — Standalone MD**  
+A single `.md` file contains both metadata (in a YAML front matter block at the top) and the full article body. There is no companion `.yml`. The `.md` file is itself the published page.
+
+Both patterns appear in the Architecture Center repo. Examples of Pattern B articles include pages under `networking/guide/` and `data-guide/disaster-recovery/` that have no associated `.yml` file. The scanner's Pass 2 picks these up by finding `.md` files with a `title` field in their front matter that are not already consumed as `[!INCLUDE]` targets by any `.yml` file.
+
+### Evaluation pipeline
+
+The scanner applies three gates in strict sequence. Each gate only runs if the previous one passed. All rows are kept in the output regardless of which gate they stopped at.
+
+| Gate | Column | Question | Stops here if… |
+|---|---|---|---|
+| **1** | `scan_status` | Did the file parse and resolve correctly? | File is broken or missing — `scan_status` = error code |
+| **2** | `in_scope` | Is this a complete, valid scenario? | Any of the four scope criteria are missing — `in_scope = FALSE` |
+| **3** | `criteria_passed` | Does the article contain a usable pricing estimate link? | No valid estimate link found — `criteria_passed = FALSE` |
+
+Comparison (`comparison_status`) only runs on rows that reach and pass Gate 3.
+
+### Gate 1 — Scan status
+
+Before any content evaluation, the scanner checks whether each file could actually be parsed and resolved. A record receives `scan_status = ok` only if the file parsed successfully and all content resolved correctly. Any structural failure sets `scan_status` to one of the error codes below, forces `in_scope = FALSE` with `out_of_scope_reason = scan_error`, and stops all further evaluation. These rows are kept in the output for auditability.
+
+| `scan_status` error code | Applies to | What it means | Common cause |
+|---|---|---|---|
+| `yaml_parse_failed` | Pattern A (YML+MD) | The `.yml` file exists but could not be parsed as valid YAML, or its top-level value is not a dictionary | Syntax errors, encoding issues, or a non-article YAML file (e.g. a `toc.yml` or `docfx.json` picked up by the glob) |
+| `missing_content_string` | Pattern A (YML+MD) | The `.yml` file parsed successfully but contains no `content` key, or its value is not a string | The YML file is a metadata-only or config file rather than an article wrapper; or the `content` field is structured as a list instead of a string |
+| `no_include_directive` | Pattern A (YML+MD) | The `content` string was found but contains no `[!INCLUDE]` directive pointing to an `.md` file | The YML embeds its article body directly as inline text instead of referencing a companion `.md` file, which is an uncommon but valid authoring pattern the scanner does not process |
+| `include_md_unresolvable` | Pattern A (YML+MD) | An `[!INCLUDE]` directive was found but the referenced path could not be resolved to a location within the repo | The path in the directive is malformed, uses an unsupported syntax, or points outside the `docs` root |
+| `include_md_missing` | Pattern A (YML+MD) | The `[!INCLUDE]` path resolved correctly but no file exists at that location on disk | The companion `.md` file was deleted, renamed, or never committed; or the YML references a file in a different branch |
+
+### Gate 2 — Scope filter (in / out of scope)
+
+Before any pass/fail evaluation runs, the scanner applies a scope filter. A scenario is **in scope (`in_scope = TRUE`)** only when **all four** of the following are present:
+
+1. **Non-blank title** — pulled from the YML metadata or MD front matter
+2. **Non-blank description** — same source
+3. **At least one Azure category** — `azureCategories` must have at least one entry
+4. **At least one architecture image** — at least one image reference (`:::image`, `![]()`, `<img>`, etc.) must appear anywhere in the article body, in any format and whether local or externally hosted
+
+Scenarios that fail one or more criteria receive `in_scope = FALSE` and an `out_of_scope_reason` that lists each failing criterion (semicolon-separated). **All rows are preserved in the output** — out-of-scope rows are visible in `scan-results` for auditability but are excluded from pass/fail evaluation, comparison, and the `needs-review` tab.
+
+### Gate 3 — Primary question (pass / fail)
 
 The scanner answers the primary question: **Does the Architecture Center article include a usable pricing estimate link?**
 
@@ -13,10 +60,7 @@ A scenario **passes (`criteria_passed = TRUE`)** if the included Markdown articl
 1. **Azure Experience / Pricing Calculator shared estimate links**  
    `https://azure.com/e/*` **or** `https://azure.microsoft.com/pricing/calculator?...shared-estimate=*`
 
-2. **Service‑scoped Pricing Calculator estimate link**  
-   `https://azure.microsoft.com/pricing/calculator?...service=*`
-
-> **Important:** Pricing Calculator tool/root links (for example, `/pricing/calculator` without a saved or scoped estimate) do **not** count as usable estimates.
+> **Important:** Pricing Calculator tool/root links (for example, `/pricing/calculator` without a saved estimate) do **not** count as usable estimates.
 
 ### Failure reasons
 
@@ -63,7 +107,7 @@ The Excel output includes a **`needs-review`** worksheet that automatically coll
 ## Repository files and what they do
 
 - `architecture-center/scripts/scan_architecture_center_yml.py`  
-  Scans Architecture Center YAML files and their included Markdown articles. Produces `scan-results.json`.
+  Scans Architecture Center YAML files and their included Markdown articles (Pattern A), and also standalone Markdown articles that have no companion YAML file (Pattern B). Produces `scan-results.json`.
 
 - `architecture-center/scripts/build_scan_results_xlsx.py`  
   Converts `scan-results.json` into the human‑readable Excel report `scan-results.xlsx`. This is the **authoritative JSON → Excel builder** and preserves **all compliant estimate links**.
@@ -105,7 +149,10 @@ After a successful run, download `scan-results.xlsx` from the workflow artifacts
 - **yml_url** — Published Architecture Center article URL
 - **image_download_urls** — Images found in the article (informational)
 - **estimate_link** — One or more usable estimate links (newline‑separated)
-- **criteria_passed** — Pricing readiness indicator
+- **scan_status** — `ok` if the file parsed and resolved correctly; otherwise one of five structural error codes (see [Gate 1 — Scan status](#gate-1--scan-status) for the full description of each)
+- **in_scope** — `TRUE` if the scenario passes all four scope criteria; `FALSE` otherwise (`scan_status = ok` rows only)
+- **out_of_scope_reason** — Why the scenario is out of scope: semicolon-separated failing criteria, or `scan_error` for Gate 1 failures
+- **criteria_passed** — Pricing readiness indicator (`in_scope = TRUE` rows only)
 - **failure_reason** — Why the scenario failed (if applicable)
 - **comparison_status** — Estimate comparison result
 - **yml_path** — Path to the scenario YAML file
@@ -114,5 +161,7 @@ After a successful run, download `scan-results.xlsx` from the workflow artifacts
 
 ### How to use the results
 
-- Treat `criteria_passed = FALSE` as **pricing gaps**, where a usable estimate link needs to be added to the Architecture Center article.
+- Treat `scan_status != ok` rows as **structural file issues** — the YML or MD file has a problem that needs fixing before the scenario can be evaluated at all.
+- Treat `scan_status = ok` + `in_scope = FALSE` rows as **out-of-scope scenarios** that need content work (missing title, description, category, or architecture image) before they can be considered for pricing readiness.
+- Treat `in_scope = TRUE` + `criteria_passed = FALSE` as **pricing gaps**, where a usable estimate link needs to be added to the Architecture Center article.
 - For any `criteria_passed = TRUE`, use `comparison_status` to determine whether the scenario is **net new** or an **existing scenario with an updated estimate link.** In both cases, this indicates a need to update the Pricing Calculator — either by adding a new estimate scenario or updating an existing one.
